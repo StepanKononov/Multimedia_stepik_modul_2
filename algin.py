@@ -1,25 +1,74 @@
+from skimage.io import imread
+from skimage import img_as_float
+import numpy as np
+
+
 def align(img, g_coord):
+    row_g, col_g = g_coord
 
-    if g_coord == (508, 237):
-        return  ((153, 237), (858, 238))
-    if g_coord == (483, 218):
-        return  ((145, 219), (817, 218))
-    if g_coord == (557, 141) :
-        return  ((204, 143), (908, 140))
-    if g_coord  == (627, 179)  :
-        return   ((243, 179), (1010, 176))
-    if g_coord== (540, 96):
-        return   ((154, 95), (922, 94))
-    if g_coord == (641, 369) :
-        return  ((258, 372), (1021, 368))
-    if g_coord == (527, 196)  :
-        return  ((144, 198), (908, 193))
-    if g_coord == (430, 140):
-        return ((82, 140), (777, 141))
-    if g_coord == (502, 254)  :
-        return ((123, 259), (880, 251))
-    if g_coord== (493, 238):
-        return  ((114, 240), (871, 235))
+    def border_cut(img, cut_procent):
+        cut_procent = cut_procent / 100
+
+        border_y = int(img.shape[0] * cut_procent)
+        border_x = int(img.shape[1] * cut_procent)
+
+        img = img[border_y: img.shape[0] - border_y, border_x: img.shape[1] - border_x]
+
+        return img
+
+    original_img = img
+
+    original_img_f = img_as_float(original_img)
+
+    # Обрезаем белую рамку.
+    # cropped_im = border_cut(original_img_f, 3)
+    cropped_im = original_img_f.copy()
+
+    # Разделяем на 3 канала.
+    channel_row_cut = int(cropped_im.shape[0] // 3)
+    b = cropped_im[: channel_row_cut, :]
+    g = cropped_im[channel_row_cut: 2 * channel_row_cut, :]
+    r = cropped_im[2 * channel_row_cut: 3 * channel_row_cut, :]
+
+    original_size = b.shape
+
+    # Обрезаем рамки.
+    b = border_cut(b, 5)
+    r = border_cut(r, 5)
+    g = border_cut(g, 5)
+
+    # Сдвигаем изображение.
+    shift_b = [0, 0, float('-inf')]
+    shift_r = [0, 0, float('-inf')]
+    shift_count = 25
+
+    def image_shift(img, shift_data, shift):
+        for x in range(-shift, shift + 1):
+            for y in range(-shift, shift + 1):
+                temp = np.roll(img, x, axis=0).copy()
+                temp = np.roll(temp, y, axis=1).copy()
+                correlation = (temp * g).sum()
+
+                if correlation > shift_data[2]:
+                    shift_data = [x, y, correlation]
+        return shift_data
+
+    shift_b = image_shift(b, shift_b, shift_count)
+    shift_r = image_shift(r, shift_r, shift_count)
+
+    b = np.roll(b, shift_b[0], axis=0)
+    b = np.roll(b, shift_b[1], axis=1)
+
+    r = np.roll(r, shift_r[0], axis=0)
+    r = np.roll(r, shift_r[1], axis=1)
+
+    row_b = row_g - original_size[0] - shift_b[0]
+    col_b = col_g - shift_b[1]
+    row_r = original_size[0] * 2 + (row_g - original_size[0]) - shift_r[0]
+    col_r = col_g - shift_r[1]
+
+    return (row_b, col_b), (row_r, col_r)
 
 
-print(align('https://stepik.org/media/attachments/lesson/58182/00.png', (1,3)))
+im = imread("00.png")
+print(align(im, (508, 237)))

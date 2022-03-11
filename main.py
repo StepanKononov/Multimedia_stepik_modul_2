@@ -3,62 +3,66 @@ from skimage import img_as_float
 from matplotlib import pyplot as plp
 import numpy as np
 
+
+def border_cut(img, cut_procent):
+    cut_procent = cut_procent / 100
+
+    border_y = int(img.shape[0] * cut_procent)
+    border_x = int(img.shape[1] * cut_procent)
+
+    img = img[border_y: img.shape[0] - border_y, border_x: img.shape[1] - border_x]
+
+    return img
+
+
 original_img = imread("00.png")
 
 imshow(original_img)
 plp.show()
 
-row_g, col_g = 508, 237
-
-print(original_img[row_g,col_g])
 original_img_f = img_as_float(original_img)
 
-border_y = int(original_img_f.shape[0] * 0.03)
-border_x = int(original_img_f.shape[1] * 0.03)
+# Обрезаем белую рамку.
+#cropped_im = border_cut(original_img_f, 3)
+cropped_im = original_img_f.copy()
 
-cropped_im = original_img_f[border_y:original_img_f.shape[0] - border_y, border_x:original_img_f.shape[1] - border_x]
-
+# Разделяем на 3 канала.
 channel_row_cut = int(cropped_im.shape[0] // 3)
-
 b = cropped_im[: channel_row_cut, :]
 g = cropped_im[channel_row_cut: 2 * channel_row_cut, :]
 r = cropped_im[2 * channel_row_cut: 3 * channel_row_cut, :]
 
-border_y_b = int(b.shape[0] * 0.03)
-border_x_b = int(b.shape[1] * 0.03)
+original_size = b.shape
+print(b.shape)
+print(r.shape)
+print(g.shape)
 
-border_y_r = int(r.shape[0] * 0.03)
-border_x_r = int(r.shape[1] * 0.03)
 
-border_y_g = int(g.shape[0] * 0.03)
-border_x_g = int(g.shape[1] * 0.03)
+# Обрезаем рамки.
+b = border_cut(b, 5)
+r = border_cut(r, 5)
+g = border_cut(g, 5)
 
-b = b[border_y_b: b.shape[0] - border_y_b, border_x_b:b.shape[1] - border_x_b]
-r = r[border_y_r: r.shape[0] - border_y_r, border_x_r:r.shape[1] - border_x_r]
-g = g[border_y_g: g.shape[0] - border_y_g, border_x_g:g.shape[1] - border_x_g]
-
+# Сдвигаем изображение.
 shift_b = [0, 0, float('-inf')]
 shift_r = [0, 0, float('-inf')]
+shift_count = 25
 
-shift = 20
 
-for x in range(-shift, shift + 1):
-    for y in range(-shift, shift + 1):
-        t_b = np.roll(b, x, axis=0).copy()
-        t_b = np.roll(t_b, y, axis=1).copy()
-        correlation = (t_b * g).sum()
+def image_shift(img, shift_data, shift):
+    for x in range(-shift, shift + 1):
+        for y in range(-shift, shift + 1):
+            temp = np.roll(img, x, axis=0).copy()
+            temp = np.roll(temp, y, axis=1).copy()
+            correlation = (temp * g).sum()
 
-        if correlation > shift_b[2]:
-            shift_b = [x, y, correlation]
+            if correlation > shift_data[2]:
+                shift_data = [x, y, correlation]
+    return shift_data
 
-for x in range(-shift, shift + 1):
-    for y in range(-shift, shift + 1):
-        t_r = np.roll(r, x, axis=0).copy()
-        t_r = np.roll(t_r, y, axis=1).copy()
-        correlation = (t_r * g).sum()
 
-        if correlation > shift_r[2]:
-            shift_r = [x, y, correlation]
+shift_b = image_shift(b, shift_b, shift_count)
+shift_r = image_shift(r, shift_r, shift_count)
 
 b = np.roll(b, shift_b[0], axis=0)
 b = np.roll(b, shift_b[1], axis=1)
@@ -66,19 +70,24 @@ b = np.roll(b, shift_b[1], axis=1)
 r = np.roll(r, shift_r[0], axis=0)
 r = np.roll(r, shift_r[1], axis=1)
 
-
 print(b.shape)
 print(r.shape)
 print(g.shape)
 
-
 ans = np.dstack((r, g, b))
 print(shift_b, shift_r)
 
-
-
 imshow(ans)
-
 imsave("ans.png", ans)
+
+row_g, col_g = 508, 237
+
+row_b = row_g - original_size[0] - shift_b[0]
+col_b = col_g - shift_b[1]
+
+row_r = original_size[0] * 2 + (row_g - original_size[0]) - shift_r[0]
+col_r = col_g - shift_r[1]
+
+print(row_b, col_b, row_r, col_r)
 
 plp.show()
